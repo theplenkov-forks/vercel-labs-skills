@@ -1360,7 +1360,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
       }
 
       installMode = modeChoice as InstallMode;
-    } else if (uniqueDirs.size <= 1) {
+    } else if (uniqueDirs.size <= 1 && parsed.type !== 'local') {
       // Single target directory — default to copy (no symlink needed)
       installMode = 'copy';
     }
@@ -1510,6 +1510,7 @@ export async function runAdd(args: string[], options: AddOptions = {}): Promise<
           result = await installSkillForAgent(skill, agent, {
             global: installGlobally,
             mode: installMode,
+            linkCanonicalToSource: parsed.type === 'local',
           });
         }
         results.push({
