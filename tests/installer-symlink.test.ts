@@ -27,6 +27,36 @@ async function makeSkillSource(root: string, name: string): Promise<string> {
 }
 
 describe('installer symlink regression', () => {
+  it('symlinks canonical directory to local source when requested', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'add-skill-'));
+    const projectDir = join(root, 'project');
+    await mkdir(projectDir, { recursive: true });
+
+    const skillName = 'local-source-symlink-skill';
+    const skillDir = await makeSkillSource(root, skillName);
+    await writeFile(join(skillDir, 'note.txt'), 'v1', 'utf-8');
+
+    try {
+      const result = await installSkillForAgent(
+        { name: skillName, description: 'test', path: skillDir },
+        'codex',
+        { cwd: projectDir, mode: 'symlink', global: false, linkCanonicalToSource: true }
+      );
+
+      expect(result.success).toBe(true);
+
+      const canonicalPath = join(projectDir, '.agents/skills', skillName);
+      const canonicalStats = await lstat(canonicalPath);
+      expect(canonicalStats.isSymbolicLink()).toBe(true);
+
+      await writeFile(join(skillDir, 'note.txt'), 'v2', 'utf-8');
+      const reflected = await readFile(join(canonicalPath, 'note.txt'), 'utf-8');
+      expect(reflected).toBe('v2');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('does not create self-loop when canonical and agent paths match', async () => {
     const root = await mkdtemp(join(tmpdir(), 'add-skill-'));
     const projectDir = join(root, 'project');
