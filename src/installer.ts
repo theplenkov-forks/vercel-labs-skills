@@ -227,7 +227,12 @@ async function createSymlink(target: string, linkPath: string): Promise<boolean>
 export async function installSkillForAgent(
   skill: Skill,
   agentType: AgentType,
-  options: { global?: boolean; cwd?: string; mode?: InstallMode } = {}
+  options: {
+    global?: boolean;
+    cwd?: string;
+    mode?: InstallMode;
+    linkCanonicalToSource?: boolean;
+  } = {}
 ): Promise<InstallResult> {
   const agent = agents[agentType];
   const isGlobal = options.global ?? false;
@@ -256,6 +261,7 @@ export async function installSkillForAgent(
   const agentDir = join(agentBase, skillName);
 
   const installMode = options.mode ?? 'symlink';
+  const linkCanonicalToSource = options.linkCanonicalToSource === true;
 
   // Validate paths
   if (!isPathSafe(canonicalBase, canonicalDir)) {
@@ -289,9 +295,18 @@ export async function installSkillForAgent(
       };
     }
 
-    // Symlink mode: copy to canonical location and symlink to agent location
-    await cleanAndCreateDirectory(canonicalDir);
-    await copyDirectory(skill.path, canonicalDir);
+    // Symlink mode: either link canonical to original source (local installs),
+    // or copy source into canonical location (remote installs).
+    if (linkCanonicalToSource) {
+      const canonicalLinked = await createSymlink(skill.path, canonicalDir);
+      if (!canonicalLinked) {
+        await cleanAndCreateDirectory(canonicalDir);
+        await copyDirectory(skill.path, canonicalDir);
+      }
+    } else {
+      await cleanAndCreateDirectory(canonicalDir);
+      await copyDirectory(skill.path, canonicalDir);
+    }
 
     // For universal agents with global install, the skill is already in the canonical
     // ~/.agents/skills directory. Skip creating a symlink to the agent-specific global dir

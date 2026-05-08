@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, rmSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, rmSync, mkdirSync, writeFileSync, lstatSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { runCli } from './test-utils.ts';
@@ -88,6 +88,34 @@ Instructions here.
     expect(result.stdout).toContain('my-skill');
     expect(result.stdout).toContain('Done!');
     expect(result.exitCode).toBe(0);
+  });
+
+  it('should symlink local skill into canonical directory by default', () => {
+    const skillDir = join(testDir, 'skills', 'my-local-skill');
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, 'SKILL.md'),
+      `---
+name: my-local-skill
+description: Local symlink test skill
+---
+
+# My Local Skill
+`
+    );
+
+    const targetDir = join(testDir, 'project');
+    mkdirSync(targetDir, { recursive: true });
+
+    const result = runCli(['add', testDir, '-y', '--agent', 'codex'], targetDir);
+    expect(result.exitCode).toBe(0);
+
+    const installedPath = join(targetDir, '.agents', 'skills', 'my-local-skill');
+    const stats = lstatSync(installedPath);
+    expect(stats.isSymbolicLink()).toBe(true);
+    expect(readFileSync(join(installedPath, 'SKILL.md'), 'utf-8')).toContain(
+      'name: my-local-skill'
+    );
   });
 
   it('should filter skills by name with --skill flag', () => {
